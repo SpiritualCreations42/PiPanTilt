@@ -1,0 +1,7 @@
+/aurora-servo-controller
+│
+├── camera_server.py      # Pi Zero 2 W web UI
+├── main.py               # Pico 2 W servo controller
+├── system_diagram.png    # Block diagram
+├── README.md             # Project documentation
+└── LICENSE               # MIT license text

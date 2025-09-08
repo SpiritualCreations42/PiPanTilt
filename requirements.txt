@@ -1,0 +1,4 @@
+flask          # Web UI framework
+requests       # HTTP client for making API calls
+picamera2      # Camera control (libcamera-based, for Pi Zero 2 W)
+gpiozero       # GPIO helper library (LEDs, buttons, etc.)
