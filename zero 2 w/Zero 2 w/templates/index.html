@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi Camera Pan/Tilt Control</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            max-width: 900px;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .video-container {
+            position: relative;
+            margin-bottom: 30px;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            background: #000;
+        }
+        
+        #videoStream {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 15px;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 10px;
+        }
+        
+        .control-buttons button {
+            border: none;
+            border-radius: 12px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: linear-gradient(145deg, #3498db, #2980b9);
+            color: white;
+            box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);
+        }
+        
+        .control-buttons button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .control-buttons button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
+        }
+        
+        .control-buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* Position buttons in grid */
+        .up { grid-column: 2; grid-row: 1; }
+        .left { grid-column: 1; grid-row: 2; }
+        .center { grid-column: 2; grid-row: 2; background: linear-gradient(145deg, #e74c3c, #c0392b); }
+        .right { grid-column: 3; grid-row: 2; }
+        .down { grid-column: 2; grid-row: 3; }
+        
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .slider {
+            writing-mode: bt-lr;
+            -webkit-appearance: slider-vertical;
+            width: 30px;
+            height: 200px;
+            background: linear-gradient(to top, #3498db, #2980b9);
+            outline: none;
+            border-radius: 15px;
+            cursor: pointer;
+        }
+        
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            background: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .slider-label {
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: center;
+        }
+        
+        .status-panel {
+            background: linear-gradient(145deg, #ecf0f1, #bdc3c7);
+            border-radius: 15px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .status-item {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status-label {
+            font-size: 14px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+        
+        .status-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+        
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+            
+            .control-buttons {
+                grid-template-columns: repeat(3, 50px);
+                grid-template-rows: repeat(3, 50px);
+            }
+            
+            .slider {
+                height: 150px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Pi Camera Control</h1>
+        
+        <div class="video-container">
+            <img id="videoStream" src="/video_feed" alt="Camera Stream" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQwIiBoZWlnaHQ9IjQ4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIyNCIgZmlsbD0iI2ZmZiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkNhbWVyYSBOb3QgQXZhaWxhYmxlPC90ZXh0Pjwvc3ZnPg=='">
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <div class="slider-container">
+                    <div class="slider-label">Pan</div>
+                    <input type="range" min="0" max="180" value="90" class="slider" id="panSlider" orient="vertical">
+                    <div id="panValue" class="slider-label">90°</div>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="control-buttons">
+                    <button class="up" onclick="moveServo('up')">↑</button>
+                    <button class="left" onclick="moveServo('left')">←</button>
+                    <button class="center" onclick="centerServos()">⌂</button>
+                    <button class="right" onclick="moveServo('right')">→</button>
+                    <button class="down" onclick="moveServo('down')">↓</button>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <div class="slider-container">
+                    <div class="slider-label">Tilt</div>
+                    <input type="range" min="60" max="120" value="90" class="slider" id="tiltSlider" orient="vertical">
+                    <div id="tiltValue" class="slider-label">90°</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="status-panel">
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">Status</div>
+                    <div class="status-value" id="streamStatus">Loading...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Resolution</div>
+                    <div class="status-value" id="resolution">Loading...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">FPS</div>
+                    <div class="status-value" id="fps">Loading...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Servo Controller</div>
+                    <div class="status-value" id="servoStatus">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Control variables
+        let isMoving = false;
+        
+        // Initialize sliders
+        const panSlider = document.getElementById('panSlider');
+        const tiltSlider = document.getElementById('tiltSlider');
+        const panValue = document.getElementById('panValue');
+        const tiltValue = document.getElementById('tiltValue');
+        
+        // Update slider displays
+        panSlider.addEventListener('input', function() {
+            panValue.textContent = this.value + '°';
+        });
+        
+        tiltSlider.addEventListener('input', function() {
+            tiltValue.textContent = this.value + '°';
+        });
+        
+        // Send slider values to servo with debouncing
+        let sliderTimeout;
+        panSlider.addEventListener('input', function() {
+            const angle = parseInt(this.value) - 90;
+            panValue.textContent = angle + '°';
+            
+            // Debounce slider movements
+            clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => {
+                sendCommand('pan', parseInt(this.value));
+            }, 200);
+        });
+        
+        tiltSlider.addEventListener('input', function() {
+            const angle = parseInt(this.value) - 90;
+            tiltValue.textContent = angle + '°';
+            
+            // Debounce slider movements  
+            clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => {
+                sendCommand('tilt', parseInt(this.value));
+            }, 200);
+        });
+        
+        // Movement functions
+        async function moveServo(direction) {
+            if (isMoving) return;
+            
+            isMoving = true;
+            const buttons = document.querySelectorAll('.control-buttons button');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                await sendCommand(direction);
+            } finally {
+                buttons.forEach(btn => btn.disabled = false);
+                isMoving = false;
+            }
+        }
+        
+        async function centerServos() {
+            if (isMoving) return;
+            
+            isMoving = true;
+            const buttons = document.querySelectorAll('.control-buttons button');
+            buttons.forEach(btn => btn.disabled = true);
+            
+            try {
+                const response = await fetch('/center', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                if (response.ok) {
+                    panSlider.value = 90;
+                    tiltSlider.value = 90;
+                    panValue.textContent = '90°';
+                    tiltValue.textContent = '90°';
+                } else {
+                    console.error('Center command failed');
+                }
+            } catch (error) {
+                console.error('Error centering servos:', error);
+            } finally {
+                buttons.forEach(btn => btn.disabled = false);
+                isMoving = false;
+            }
+        }
+        
+        async function sendCommand(command, value = null) {
+            try {
+                const response = await fetch('/control', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        command: command,
+                        value: value
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Command failed:', command);
+                }
+            } catch (error) {
+                console.error('Error sending command:', error);
+            }
+        }
+        
+        // Update status
+        async function updateStatus() {
+            try {
+                const response = await fetch('/status');
+                const status = await response.json();
+                
+                document.getElementById('streamStatus').textContent = 
+                    status.streaming ? 'Streaming' : 'Stopped';
+                document.getElementById('resolution').textContent = status.resolution;
+                document.getElementById('fps').textContent = status.fps + ' FPS';
+                document.getElementById('servoStatus').textContent = status.pico_ip;
+                
+            } catch (error) {
+                console.error('Error updating status:', error);
+                document.getElementById('streamStatus').textContent = 'Error';
+            }
+        }
+        
+        // Keyboard controls
+        document.addEventListener('keydown', function(event) {
+            if (isMoving) return;
+            
+            switch(event.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    event.preventDefault();
+                    moveServo('up');
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    event.preventDefault();
+                    moveServo('down');
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    event.preventDefault();
+                    moveServo('left');
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    event.preventDefault();
+                    moveServo('right');
+                    break;
+                case ' ':
+                case 'c':
+                case 'C':
+                    event.preventDefault();
+                    centerServos();
+                    break;
+            }
+        });
+        
+        // Initialize
+        updateStatus();
+        setInterval(updateStatus, 5000); // Update every 5 seconds
+    </script>
+</body>
+</html>
