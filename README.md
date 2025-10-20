@@ -12,6 +12,7 @@
 This project connects a **Raspberry Pi Zero 2 W** running a web UI to a **Raspberry Pi Pico 2 W** that drives pan/tilt servos.  
 The Pi Zero serves a control dashboard, and the Pico listens for commands over Wi-Fi.
 
+![pantilt](images/pantilt.jpg)
 ---
 
 ## 🛠 Hardware
@@ -123,3 +124,4 @@ sequenceDiagram ![alt text](image-2-1.png)
 ## 📜 License
 
 This project is licensed under the terms of the [MIT License](LICENSE)
+
